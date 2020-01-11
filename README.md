@@ -99,8 +99,11 @@ changed in kdtree-jk-structs.lisp in the line
   Create a KDRESULT with 20 slots; it will be expanded as necessary.
 
 `(kdresult-n kdresult)`  -  The number of search results returned
+
 `(kdresult-obj-vec kdresult)` - a vector of the OBJECTS returned
+
 `(kdresult-index-vec kdresult)` - a vector of the indices in the kdtree
+
 `(kdresult-dist-vec kdresult)` - a vector of distances from the search
                                vector in (kd-search-in-radius ...)
   
