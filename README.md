@@ -1,9 +1,14 @@
 # KDTREE-JK is a package for building efficent KD-Trees in Common Lisp
 
-Data are stored in block arrays, for minimal (usually zero) consing
-and allocation overheads.
+A KD-Tree is a data structure for searching N-dimensional space in
+log(N) time by splitting a data set iteratively across, eg for 3
+dimensions, dimensions x,y,z,x,y,z
 
-Balancing is done in-place with Wirth's median partition method, so
+In KDTREE-JTK, data are stored in block arrays instead of linked
+structures, for minimal (usually zero) consing and allocation
+overheads.
+
+Balancing is done in-place with Wirth's median partition method, so it
 should be fast and memory efficient.
 
 By default, all floats are double precision, but this can be
@@ -84,7 +89,7 @@ changed in kdtree-jk-structs.lisp in the line
 
 `(kdtree-avg-depth kdtree)`
 
-   Float representing the average depth of a node.a
+   Float representing the average depth of a node.
 
 
 ## KDRESULT 
