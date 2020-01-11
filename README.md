@@ -19,7 +19,7 @@ changed in kdtree-jk-structs.lisp in the line
 
    Build a KDTREE of ndim dimensions, with initial allocation of
    npoints.  As points are added, the arrays are expanded by a factor of
-   *kdtree-expansion-factor*, by default 1.5.  Thus it is nice but not
+   \*kdtree-expansion-factor\*, by default 1.5.  Thus it is nice but not
    crucial to  make npoints large enough to begin with.
 
 
