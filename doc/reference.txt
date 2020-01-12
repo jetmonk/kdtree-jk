@@ -1,295 +1,181 @@
+KDTREE-JK is a package for building efficient KD-Trees in Common Lisp
+
+A KD-Tree is a data structure for searching N-dimensional space in
+log(N) time by partitioning a data set iteratively across dimensions.
+For example, in 3D, the first layer partitions in x, the 2nd in y, then
+z,x,y,z,x,y ...
 
 
-================================================================
-===== Usage Example ============================================
-================================================================
+In KDTREE-JK, data are stored in block arrays instead of linked
+structures, for minimal (usually zero) consing and allocation
+overheads.
 
-;; create KD tree
-cl-user> (defparameter *kd* (kdtree-jk::build-kdtree 2 :npoints 8))
-*kd*
-
-;; look at it
-cl-user> *kd*
-#S(kdtree-jk:kdtree
-   :ndim 2
-   :npoints 0
-   :needs-balancing nil
-   :idepth 0
-   :avg-depth 0.0d0
-   :npoints-total 8
-   :flag-vec #*00000000
-   :ir-vec #(-1 -1 -1 -1 -1 -1 -1 -1) 
-   :index-left-vec #(-1 -1 -1 -1 -1 -1 -1 -1)
-   :index-right-vec #(-1 -1 -1 -1 -1 -1 -1 -1)
-   :obj-vec #(nil nil nil nil nil nil nil nil)
-   :sd-vec #(0 0 0 0 0 0 0 0)
-   :r-vec #2A((0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0))
-   :bbox #S(kdtree-jk:bbox
-            :ndim 2
-            :rmin-vec #(0.0d0 0.0d0)
-            :rmax-vec #(0.0d0 0.0d0)))
-
-;; insert 10 points, with the object being a string
-cl-user>  (loop with v = (make-array 2 :element-type 'double-float)
-		for i below 10
-		for object = (format nil "object-~D" i)
-		do 
-		   (setf (aref v 0) (random 10d0))
-		   (setf (aref v 1) (random 10d0))
-		   (kdtree-jk::insert-vector *kd* v object))
-
-;; note that tree has expanded to 13 elements (factor of ~1.5)
-cl-user> *kd*
-#S(kdtree-jk:kdtree
-   :ndim 2
-   :npoints 10
-   :needs-balancing nil
-   :idepth 3
-   :avg-depth 1.2d0
-   :npoints-total 13
-   :flag-vec #*1111111111000
-   :ir-vec #(0 1 2 3 4 5 6 7 8 9 -1 -1 -1)
-   :index-left-vec #(1 2 7 6 8 -1 9 -1 -1 -1 -1 -1 -1)
-   :index-right-vec #(3 5 4 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1)
-   :obj-vec #("object-0" "object-1" "object-2" "object-3" "object-4" "object-5"
-              "object-6" "object-7" "object-8" "object-9" nil nil nil)
-   :sd-vec #(0 1 0 1 1 0 0 1 0 1 0 0 0)
-   :r-vec #2A((5.935203326093315d0 5.105117606938368d0)
-              (2.7310586222776823d0 8.802804536254886d0)
-              (2.286403962302186d0 4.698585577562541d0)
-              (6.187378412604405d0 9.35440905251598d0)
-              (4.973436366002762d0 5.338583701931789d0)
-              (4.080494323866947d0 9.189060767072345d0)
-              (7.601027733975121d0 7.108452075277823d0)
-              (0.1384111205078531d0 2.856169934794337d0)
-              (4.972991335270802d0 2.7570119300436735d0)
-              (5.944462248730624d0 8.723228331712976d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0))
-   :bbox #S(kdtree-jk:bbox
-            :ndim 2
-            :rmin-vec #(0.1384111205078531d0 2.7570119300436735d0)
-            :rmax-vec #(7.601027733975121d0 9.35440905251598d0)))
+Balancing is done in-place with Wirth's median partition method, so it
+should be fast and memory efficient.
 
 
-;; search in radius of 3 around #(2 3), returning a kd-result
-cl-user> (kdtree-jk:kd-search-in-radius
-	  *kd* 
-	  (make-array 2 :element-type 'double-float
-			:initial-contents '(2d0 3d0)) 
-	  3d0)
 
-#S(kdtree-jk:kdresult
-   :n 3
-   :obj-vec #("object-2" "object-7" "object-8" nil nil nil nil nil nil nil)
-   :index-vec #(2 7 8 -1 -1 -1 -1 -1 -1 -1)
-   :dist-vec #(1.7225621016166193d0 1.8671369108626963d0 2.9829047389644154d0
-               0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0))
+By default, all floats are double precision, but this can be
+changed in kdtree-jk-structs.lisp in the line
+
+  (deftype kd-float ()
+    'double-float)
 
 
-;; delete these objects
-cl-user> (kdtree-jk:kd-search-in-radius
-	  *kd* 
-	  (make-array 2 :element-type 'double-float
-			:initial-contents '(2d0 3d0)) 
-	  3d0
-          :action (kdtree-jk:make-deletion-action))
-nil
+=== Usage Example ===========
 
-;; deleted objects stay in the tree as ignored nodes
-cl-user> *kd*
-#S(kdtree-jk:kdtree
-   :ndim 2
-   :npoints 10
-   :needs-balancing nil
-   :idepth 3
-   :avg-depth 1.2d0
-   :npoints-total 13
-   :flag-vec #*1111111111000
-   :ir-vec #(0 1 2 3 4 5 6 7 8 9 -1 -1 -1)
-   :index-left-vec #(1 2 7 6 8 -1 9 -1 -1 -1 -1 -1 -1)
-   :index-right-vec #(3 5 4 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1)
-   :obj-vec #("object-0" "object-1" kdtree-jk::deleted-object "object-3"
-              "object-4" "object-5" "object-6" kdtree-jk::deleted-object
-              kdtree-jk::deleted-object "object-9" nil nil nil)
-   :sd-vec #(0 1 0 1 1 0 0 1 0 1 0 0 0)
-   :r-vec #2A((5.935203326093315d0 5.105117606938368d0)
-              (2.7310586222776823d0 8.802804536254886d0)
-              (2.286403962302186d0 4.698585577562541d0)
-              (6.187378412604405d0 9.35440905251598d0)
-              (4.973436366002762d0 5.338583701931789d0)
-              (4.080494323866947d0 9.189060767072345d0)
-              (7.601027733975121d0 7.108452075277823d0)
-              (0.1384111205078531d0 2.856169934794337d0)
-              (4.972991335270802d0 2.7570119300436735d0)
-              (5.944462248730624d0 8.723228331712976d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0))
-   :bbox #S(kdtree-jk:bbox  ;; WARNING - bounding box includes deleted nodes
-            :ndim 2
-            :rmin-vec #(0.1384111205078531d0 2.7570119300436735d0)
-            :rmax-vec #(7.601027733975121d0 9.35440905251598d0)))
+See usage-example.txt
 
-;; now the same search returns nothing
-cl-user> (kdtree-jk:kd-search-in-radius
-	  *kd* 
-	  (make-array 2 :element-type 'double-float
-			:initial-contents '(2d0 3d0)) 
-	  3d0)
-#S(kdtree-jk:kdresult
-   :n 0
-   :obj-vec #(nil nil nil nil nil nil nil nil nil nil)
-   :index-vec #(-1 -1 -1 -1 -1 -1 -1 -1 -1 -1)
-   :dist-vec #(0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0))
+==== Main functions =========
+
+(build-kdtree ndim :npoints 10)
+
+   Build a KDTREE of ndim dimensions, with initial allocation of
+   npoints.  As points are added, the arrays are expanded by a factor of
+   *kdtree-expansion-factor*, by default 1.5.  Thus it is nice but not
+   crucial to  make npoints large enough to begin with.
 
 
-;; clean up tree using balance-kdtree; this will also get rid of deleted nodes.
+(insert-vector kdtree vec object &key defer)
 
-cl-user> (kdtree-jk:balance-kdtree *kd*)
-t
-cl-user> *kd*
-#S(kdtree-jk:kdtree
-   :ndim 2
-   :npoints 7
-   :needs-balancing nil
-   :idepth 2
-   :avg-depth 1.4285714285714284d0
-   :npoints-total 13
-   :flag-vec #*1111111000000
-   :ir-vec #(0 1 3 4 6 5 2 -1 -1 -1 -1 -1 -1)
-   :index-left-vec #(1 2 -1 -1 5 -1 -1 -1 -1 -1 -1 -1 -1)
-   :index-right-vec #(4 3 -1 -1 6 -1 -1 -1 -1 -1 -1 -1 -1)
-   :obj-vec #("object-0" "object-1" "object-3" "object-4" "object-5" "object-6"
-              "object-9" nil nil nil nil nil nil)
-   :sd-vec #(0 1 0 0 1 0 0 0 0 0 0 0 0)
-   :r-vec #2A((5.935203326093315d0 5.105117606938368d0)
-              (2.7310586222776823d0 8.802804536254886d0)
-              (6.187378412604405d0 9.35440905251598d0)
-              (4.973436366002762d0 5.338583701931789d0)
-              (4.080494323866947d0 9.189060767072345d0)
-              (7.601027733975121d0 7.108452075277823d0)
-              (5.944462248730624d0 8.723228331712976d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0))
-   :bbox #S(kdtree-jk:bbox ;; bounding box fixed
-            :ndim 2
-            :rmin-vec #(2.7310586222776823d0 5.105117606938368d0)
-            :rmax-vec #(7.601027733975121d0 9.35440905251598d0)))
+  Insert a vector V corresponding to OBJECT into NDIM KDTREE,
+  returning the index where it ended up.
+
+  If DEFER keyword is set, then the tree-insertion is deferred to save
+  time, but it will be necessary to run BALANCE-KDTREE before
+  use. This is useful for creating a balanced tree from unbalanced or
+  nonrandom data.  Searching a tree that has not been balanced but
+  that was inserted with DEFER generates an error.
+
+(insert-2d kdtree x y   object &key (vec nil) (defer nil))
+(insert-3d kdtree x y z object &key (vec nil) (defer nil))
+
+  2d and 3d convenience functions.  VEC is a optional vector of the
+  correct kd-float type to reduce consing, and DEFER is as above.
+
+(balance-kdtree kdtree)
+
+  Balance KDTREE.  Useful if data were inserted with :DEFER, or if
+  data were non-random or unbalanced.  This is efficient, consing
+  only one integer vector of the size of the tree.
 
 
-;; shrink it, if we wish
+(kd-search-in-radius kdtree v radius &key (kdresult nil) (sort nil))
 
-cl-user> (kdtree-jk:kdtree-minimize-size *kd*)
-7
-cl-user> *kd*
-#S(kdtree-jk:kdtree
-   :ndim 2
-   :npoints 7
-   :needs-balancing nil
-   :idepth 2
-   :avg-depth 1.4285714285714284d0
-   :npoints-total 7
-   :flag-vec #*1111111
-   :ir-vec #(0 1 3 4 6 5 2)
-   :index-left-vec #(1 2 -1 -1 5 -1 -1)
-   :index-right-vec #(4 3 -1 -1 6 -1 -1)
-   :obj-vec #("object-0" "object-1" "object-3" "object-4" "object-5" "object-6"
-              "object-9")
-   :sd-vec #(0 1 0 0 1 0 0)
-   :r-vec #2A((5.935203326093315d0 5.105117606938368d0)
-              (2.7310586222776823d0 8.802804536254886d0)
-              (6.187378412604405d0 9.35440905251598d0)
-              (4.973436366002762d0 5.338583701931789d0)
-              (4.080494323866947d0 9.189060767072345d0)
-              (7.601027733975121d0 7.108452075277823d0)
-              (5.944462248730624d0 8.723228331712976d0))
-   :bbox #S(kdtree-jk:bbox
-            :ndim 2
-            :rmin-vec #(2.7310586222776823d0 5.105117606938368d0)
-            :rmax-vec #(7.601027733975121d0 9.35440905251598d0)))
+ Search KDTREE for points within RADIUS of float vector V.  If keyword
+ :KDRESULT is NIL, then a KDRESULT will be created.  Otherwise, given
+ KDRESULT will be used to return the result.
 
+ If NEAREST-POINT is set, return just the nearest point.  This is
+ especially efficient because the internal search radius keeps
+ shrinking.
 
-;; insert some points but DEFER placing into tree
-;; (faster for bulk insertion, then allows balancing)
+ If SORT is true, then the KDRESULT is sorted by increasing distance
+ from point given.
+ 
 
-cl-user>  (loop with v = (make-array 2 :element-type 'double-float)
-		for i below 3
-		for object = (format nil "object-~DB" i) ;; name them with 'B'
-		do 
-		   (setf (aref v 0) (random 10d0))
-		   (setf (aref v 1) (random 10d0))
-		   (kdtree-jk::insert-vector *kd* v object 
-					     :defer t))
-		    
-nil
+(kd-search-in-radius kdtree v radius
+     &key (kdresult nil) (sort nil)
+          (nearest-point nil) (action nil))
 
-cl-user> *kd*
-#S(kdtree-jk:kdtree
-   :ndim 2
-   :npoints 10
-   :needs-balancing t ;; NB - new points not in tree, only in r-vec and obj-vec
-   :idepth 2
-   :avg-depth 0.9999999999999999d0
-   :npoints-total 12
-   :flag-vec #*111111111100
-   :ir-vec #(0 1 3 4 6 5 2 7 8 9 -1 -1)
-   :index-left-vec #(1 2 -1 -1 5 -1 -1 -1 -1 -1 -1 -1)
-   :index-right-vec #(4 3 -1 -1 6 -1 -1 -1 -1 -1 -1 -1)
-   :obj-vec #("object-0" "object-1" "object-3" "object-4" "object-5" "object-6"
-              "object-9" "object-0B" "object-1B" "object-2B" nil nil)
-   :sd-vec #(0 1 0 0 1 0 0 0 0 0 0 0)
-   :r-vec #2A((5.935203326093315d0 5.105117606938368d0)
-              (2.7310586222776823d0 8.802804536254886d0)
-              (6.187378412604405d0 9.35440905251598d0)
-              (4.973436366002762d0 5.338583701931789d0)
-              (4.080494323866947d0 9.189060767072345d0)
-              (7.601027733975121d0 7.108452075277823d0)
-              (5.944462248730624d0 8.723228331712976d0)
-              (5.881732660955303d0 9.862030933066134d0)
-              (2.1724224176494067d0 8.972378631652987d0)
-              (5.061980634929508d0 7.903482774948518d0)
-              (0.0d0 0.0d0)
-              (0.0d0 0.0d0))
-   :bbox #S(kdtree-jk:bbox
-            :ndim 2
-            :rmin-vec #(2.1724224176494067d0 5.105117606938368d0)
-            :rmax-vec #(7.601027733975121d0 9.862030933066134d0)))
+  Search KDTREE for points within RADIUS of float vector V.  If
+  keyword :KDRESULT is NIL, then a KDRESULT will be created.
+  Otherwise, the given KDRESULT will be used to return the result.
 
-;; it will generate an error to search the tree after a DEFER, so we
-;;   balance the tree
+  If NEAREST-POINT is set, return just the nearest point.  This is
+  especially efficient because the internal search radius keeps
+  shrinking.
 
-cl-user> (kdtree-jk:balance-kdtree *kd*)
+  If SORT is true, then the KDRESULT is sorted by increasing distance
+  from point given.
 
-;; try a bounding-box search
+  If ACTION is supplied, than it is applied to each matching point,
+  and KDRESULT is ignored and set to NIL.  It is called as
+  (FUNCALL ACTION INODE) where INODE is the linear index of a node.
 
-;; first make the BBOX
+  :ACTION (MAKE-DELETION-ACTION), for example, deletes an element by
+  setting its value to a special symbol 'DELETED-OBJECT.
 
-cl-user> (defparameter *bbox* (kdtree-jk:build-bbox '(1 5) '(4 10)))
-*bbox*
-cl-user> *bbox*
-#S(kdtree-jk:bbox
-   :ndim 2
-   :rmin-vec #(1.0d0 5.0d0)
-   :rmax-vec #(4.0d0 10.0d0))
+(kd-search-in-box kdtree bbox &key (kdresult nil) (action nil))
+
+  Search KDTREE for points inside bounding box BBOX (of type BBOX).
+  If keyword :KDRESULT is NIL, then a KDRESULT will be created.
+  Otherwise, given KDRESULT will be used to return the result.
+
+  If ACTION is supplied, than it is applied to each matching point,
+  and KDRESULT is ignored and set to NIL.  It is called as
+  (FUNCALL ACTION INODE) where INODE is the linear index of a node.
+
+  :ACTION (MAKE-DELETION-ACTION), for example, deletes an element by
+  setting its value to a special symbol 'DELETED-OBJECT.
+
+(kd-find-k-nearest kdtree v k-nearest &key (rstart nil) (kdresult nil))
+
+  Find k-nearest objects in kdtree, by doing increasing radial
+  searches. The returned KDRESULT will contain at least K-NEAREST
+  points, sorted by radius.  It us up to the user to truncate the
+  result to the first K-NEAREST.
+
+  RSTART is an optional starting radius size.  By default, it it set
+  using the volume fraction expected to be occupied by K-NEAREST points.
+
+  Returns the number of search iterations as the second value.
+
+(kdtree-idepth kdtree)
+
+   The maximum depth of a KDTREE.  Should not be much more than
+   (log npoints 2) if KDTREE is reasonably balanced.
+
+(kdtree-avg-depth kdtree)
+
+   Float representing the average depth of a node.a
 
 
-;; then search it
-cl-user> (kdtree-jk:kd-search-in-bbox *kd* *bbox*)
-#S(kdtree-jk:kdresult
-   :n 2
-   :obj-vec #("object-1" "object-1B" nil nil nil nil nil nil nil nil)
-   :index-vec #(1 3 -1 -1 -1 -1 -1 -1 -1 -1)
-   :dist-vec #(0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0))
+(kdtree-minimize kdtree)
+
+  Make the arrays in KDTREE just large enough to hold the data
+
+
+(make-deletion-action &key (test (constantly t)))
+
+  Function to generate a function to pass as an :ACTION, to delete
+  objects according to :TEST.
+
+  TEST is an optional function taking the OBJECT inside
+  KDTREE-OBJ-VEC, returning T if this object is to be deleted.
+
+  For example, (MAKE-DELETION-ACTION (LAMBDA (OBJ) (EQ OBJ *MY-OBJ*)))
+  will return an action to delete objects EQ to *MY-OBJ* that are
+  picked up by the search.  and (MAKE-DELETION-ACTION) will return an
+  action to delete all objects picked up by the KDTREE search.
+ 
+
+===== KDRESULT ===========================
+
+(build-kdresult &key (n 20))
+
+  Create a KDRESULT with 20 slots; it will be expanded as necessary.
+
+(kdresult-n kdresult)  -  The number of search results returned
+
+(kdresult-obj-vec kdresult) - a vector of the OBJECTS returned
+
+(kdresult-index-vec kdresult) - a vector of the indices in the kdtree
+
+(kdresult-dist-vec kdresult) - a vector of distances from the search
+                               vector in (kd-search-in-radius ...)
+  
+====== BBOX (Bounding Box) =================
+
+(build-bbox '(x1 y1 z1 ..) '(x2 y2 z2 ..))
+  Build a BBOX extending from x1..x2, y1..y2, etc, that is used
+  to constrain a box search.  There is also a diagnostic BBOX inside
+  a KDTREE to identify its covered space.
+
+
+===== Testing functions =======
+
+kdtree-jk-tests.lisp contains functions to compare box and radius
+searches with 
+
+
