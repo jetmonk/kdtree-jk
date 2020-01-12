@@ -1,0 +1,181 @@
+KDTREE-JK is a package for building efficient KD-Trees in Common Lisp
+
+A KD-Tree is a data structure for searching N-dimensional space in
+log(N) time by partitioning a data set iteratively across dimensions.
+For example, in 3D, the first layer partitions in x, the 2nd in y, then
+z,x,y,z,x,y ...
+
+
+In KDTREE-JK, data are stored in block arrays instead of linked
+structures, for minimal (usually zero) consing and allocation
+overheads.
+
+Balancing is done in-place with Wirth's median partition method, so it
+should be fast and memory efficient.
+
+
+
+By default, all floats are double precision, but this can be
+changed in kdtree-jk-structs.lisp in the line
+
+  (deftype kd-float ()
+    'double-float)
+
+
+=== Usage Example ===========
+
+See usage-example.txt
+
+==== Main functions =========
+
+(build-kdtree ndim :npoints 10)
+
+   Build a KDTREE of ndim dimensions, with initial allocation of
+   npoints.  As points are added, the arrays are expanded by a factor of
+   *kdtree-expansion-factor*, by default 1.5.  Thus it is nice but not
+   crucial to  make npoints large enough to begin with.
+
+
+(insert-vector kdtree vec object &key defer)
+
+  Insert a vector V corresponding to OBJECT into NDIM KDTREE,
+  returning the index where it ended up.
+
+  If DEFER keyword is set, then the tree-insertion is deferred to save
+  time, but it will be necessary to run BALANCE-KDTREE before
+  use. This is useful for creating a balanced tree from unbalanced or
+  nonrandom data.  Searching a tree that has not been balanced but
+  that was inserted with DEFER generates an error.
+
+(insert-2d kdtree x y   object &key (vec nil) (defer nil))
+(insert-3d kdtree x y z object &key (vec nil) (defer nil))
+
+  2d and 3d convenience functions.  VEC is a optional vector of the
+  correct kd-float type to reduce consing, and DEFER is as above.
+
+(balance-kdtree kdtree)
+
+  Balance KDTREE.  Useful if data were inserted with :DEFER, or if
+  data were non-random or unbalanced.  This is efficient, consing
+  only one integer vector of the size of the tree.
+
+
+(kd-search-in-radius kdtree v radius &key (kdresult nil) (sort nil))
+
+ Search KDTREE for points within RADIUS of float vector V.  If keyword
+ :KDRESULT is NIL, then a KDRESULT will be created.  Otherwise, given
+ KDRESULT will be used to return the result.
+
+ If NEAREST-POINT is set, return just the nearest point.  This is
+ especially efficient because the internal search radius keeps
+ shrinking.
+
+ If SORT is true, then the KDRESULT is sorted by increasing distance
+ from point given.
+ 
+
+(kd-search-in-radius kdtree v radius
+     &key (kdresult nil) (sort nil)
+          (nearest-point nil) (action nil))
+
+  Search KDTREE for points within RADIUS of float vector V.  If
+  keyword :KDRESULT is NIL, then a KDRESULT will be created.
+  Otherwise, the given KDRESULT will be used to return the result.
+
+  If NEAREST-POINT is set, return just the nearest point.  This is
+  especially efficient because the internal search radius keeps
+  shrinking.
+
+  If SORT is true, then the KDRESULT is sorted by increasing distance
+  from point given.
+
+  If ACTION is supplied, than it is applied to each matching point,
+  and KDRESULT is ignored and set to NIL.  It is called as
+  (FUNCALL ACTION INODE) where INODE is the linear index of a node.
+
+  :ACTION (MAKE-DELETION-ACTION), for example, deletes an element by
+  setting its value to a special symbol 'DELETED-OBJECT.
+
+(kd-search-in-box kdtree bbox &key (kdresult nil) (action nil))
+
+  Search KDTREE for points inside bounding box BBOX (of type BBOX).
+  If keyword :KDRESULT is NIL, then a KDRESULT will be created.
+  Otherwise, given KDRESULT will be used to return the result.
+
+  If ACTION is supplied, than it is applied to each matching point,
+  and KDRESULT is ignored and set to NIL.  It is called as
+  (FUNCALL ACTION INODE) where INODE is the linear index of a node.
+
+  :ACTION (MAKE-DELETION-ACTION), for example, deletes an element by
+  setting its value to a special symbol 'DELETED-OBJECT.
+
+(kd-find-k-nearest kdtree v k-nearest &key (rstart nil) (kdresult nil))
+
+  Find k-nearest objects in kdtree, by doing increasing radial
+  searches. The returned KDRESULT will contain at least K-NEAREST
+  points, sorted by radius.  It us up to the user to truncate the
+  result to the first K-NEAREST.
+
+  RSTART is an optional starting radius size.  By default, it it set
+  using the volume fraction expected to be occupied by K-NEAREST points.
+
+  Returns the number of search iterations as the second value.
+
+(kdtree-idepth kdtree)
+
+   The maximum depth of a KDTREE.  Should not be much more than
+   (log npoints 2) if KDTREE is reasonably balanced.
+
+(kdtree-avg-depth kdtree)
+
+   Float representing the average depth of a node.a
+
+
+(kdtree-minimize kdtree)
+
+  Make the arrays in KDTREE just large enough to hold the data
+
+
+(make-deletion-action &key (test (constantly t)))
+
+  Function to generate a function to pass as an :ACTION, to delete
+  objects according to :TEST.
+
+  TEST is an optional function taking the OBJECT inside
+  KDTREE-OBJ-VEC, returning T if this object is to be deleted.
+
+  For example, (MAKE-DELETION-ACTION (LAMBDA (OBJ) (EQ OBJ *MY-OBJ*)))
+  will return an action to delete objects EQ to *MY-OBJ* that are
+  picked up by the search.  and (MAKE-DELETION-ACTION) will return an
+  action to delete all objects picked up by the KDTREE search.
+ 
+
+===== KDRESULT ===========================
+
+(build-kdresult &key (n 20))
+
+  Create a KDRESULT with 20 slots; it will be expanded as necessary.
+
+(kdresult-n kdresult)  -  The number of search results returned
+
+(kdresult-obj-vec kdresult) - a vector of the OBJECTS returned
+
+(kdresult-index-vec kdresult) - a vector of the indices in the kdtree
+
+(kdresult-dist-vec kdresult) - a vector of distances from the search
+                               vector in (kd-search-in-radius ...)
+  
+====== BBOX (Bounding Box) =================
+
+(build-bbox '(x1 y1 z1 ..) '(x2 y2 z2 ..))
+  Build a BBOX extending from x1..x2, y1..y2, etc, that is used
+  to constrain a box search.  There is also a diagnostic BBOX inside
+  a KDTREE to identify its covered space.
+
+
+===== Testing functions =======
+
+kdtree-jk-tests.lisp contains functions to compare box and radius
+searches with 
+
+

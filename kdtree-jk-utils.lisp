@@ -42,14 +42,13 @@ go on right side, and J goes in the parent node.
 	       ;; if the final index is kk, then this also
 	       ;; ensures that v[j<kk]<=v[kk]<=v[j>kk]
 	       ;; 
-	       (declare ;(type indexvecd  v)
-			(type fixnum k nv1 nv2)
+	       (declare (type fixnum k nv1 nv2)
 			(optimize speed))
-	       (let ((i 0) (j 0) (l nv1) (m 0) (x 0.0)
+	       (let ((i 0) (j 0) (l nv1) (m 0) (x (coerce 0 'kd-float))
 		     (kk (+ k nv1))
 		     (n (1+ nv2)))
 		 (declare (type fixnum i j l m n kk)
-			  (type single-float x))
+			  (type kd-float x))
 		 (when (>= k n) 
 		   (error "k=~D is too big; must be <~D" k n))
 		 (setf m (1- n))
@@ -78,3 +77,63 @@ go on right side, and J goes in the parent node.
 	j))))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; remove the 'deleted-objects from kd-tree, compacting the
+;; kdtree-r-vec and kdtree-obj-vec arrays
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun %remove-deleted-objects (kdtree)
+  (declare (type kdtree kdtree)
+	   (optimize speed))
+  (setf (kdtree-needs-balancing kdtree) t) ;; this function messes up the tree
+  (let ((np (kdtree-npoints kdtree))
+	(npnew 0)
+	(rvec (kdtree-r-vec kdtree))
+	(fix-bbox nil) ;; need to fix bounding box to reflect removed points
+	(objvec (kdtree-obj-vec kdtree)))
+    (declare (type index npnew))
+    (loop with jtarg of-type index = 0
+	  for  jsrc of-type index below np
+	  if (not (eq (aref objvec jsrc) 'deleted-object))
+	    do (incf npnew)
+	       (when (not (= jsrc jtarg))
+		 (setf (aref objvec jtarg)
+		       (aref objvec jsrc))
+		 (loop for idim below (kdtree-ndim kdtree)
+		       do (setf (aref rvec jtarg idim)
+				(aref rvec jsrc idim))))
+	       (incf jtarg)
+	  else
+	    do (setf fix-bbox t))
+    (setf (kdtree-npoints kdtree) npnew)
+
+    ;; not necessary, but it will make kdtree easier to examine visually
+    ;; and shorter to dump
+    (loop with zero = (coerce 0 'kd-float)
+	  for i from npnew below (kdtree-npoints-total kdtree)
+	  do (setf (aref objvec i) nil)
+	     (setf (aref (kdtree-ir-vec kdtree) i) +end+)
+	     (setf (aref (kdtree-index-left-vec kdtree) i) +end+)
+	     (setf (aref (kdtree-index-right-vec kdtree) i) +end+)
+	     (setf (aref (kdtree-flag-vec kdtree) i) +empty+)
+	     (setf (aref (kdtree-sd-vec kdtree) i) 0)
+	     (loop for k below (kdtree-ndim kdtree)
+		   do (setf (aref rvec i k) zero)))
+
+    (when fix-bbox
+      (loop with rmin-vec = (bbox-rmin-vec (kdtree-bbox kdtree))
+	    with rmax-vec = (bbox-rmax-vec (kdtree-bbox kdtree))
+	      initially (loop for i below (kdtree-ndim kdtree)
+			      do (setf (aref rmin-vec i) (aref rvec 0 i))
+				 (setf (aref rmax-vec i) (aref rvec 0 i)))
+	    for j from 1 below npnew
+	    do
+	       (loop
+		 for i below (kdtree-ndim kdtree)
+		 for rji of-type kd-float = (aref rvec j i)
+		 do (setf (aref rmin-vec i) (min rji (aref rmin-vec i)))
+		    (setf (aref rmax-vec i) (max rji (aref rmax-vec i))))))
+    t))
+	  
+	

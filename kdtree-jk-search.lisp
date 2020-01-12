@@ -54,12 +54,16 @@ representing the bounds."
     kdresult))
 	     
 
-(defun %insert-point-in-kdresult (kdtree kdresult k dist)
+;; insert index K from KDTREE into KDRESULT, at distance DIST
+;; if OVERWRITE is set, then don't increment the counter so that
+;; this point overwrites the last one
+(declaim (inline %insert-point-in-kdresult))
+(defun %insert-point-in-kdresult (kdtree kdresult k dist2 overwrite)
   (declare (type kdtree kdtree)
 	   (type kdresult kdresult)
-	   (type kd-float dist)
-	   (optimize speed))
-  (when (=  (kdresult-n kdresult)
+	   (type kd-float dist2)
+	   (optimize (speed 3) (safety 1)))
+  (when (= (kdresult-n kdresult)
 	    (length (kdresult-obj-vec kdresult)))
     (%expand-kdresult kdresult))
   (let ((n (kdresult-n kdresult))
@@ -67,8 +71,10 @@ representing the bounds."
     (setf (aref (kdresult-obj-vec kdresult) n)
 	  (aref (kdtree-obj-vec kdtree) j))
     (setf (aref (kdresult-index-vec kdresult) n) k)
-    (setf (aref (kdresult-dist-vec kdresult) n) dist)
-    (incf (kdresult-n kdresult))))
+    (setf (aref (kdresult-dist-vec kdresult) n) (sqrt (the (real 0) dist2)))
+    (when (not overwrite)
+      (incf (kdresult-n kdresult)))))
+
   
 
 ;; FIXME - would be nice to have specialized in-place heapsort without consing
@@ -88,38 +94,69 @@ representing the bounds."
 		     (aref (kdresult-obj-vec kdresult)   i) (third lst))))))
 
 
-(defun kd-search-in-radius (kdtree v radius &key (kdresult nil) (sort nil))
-  "Search KDTREE for points within RADIUS of float vector V.  If keyword :KDRESULT
-is NIL, then a KDRESULT will be created.  Otherwise, given KDRESULT will be used to
-return the result.
+(defun kd-search-in-radius (kdtree v radius &key (kdresult nil) (sort nil) (nearest-point nil) (action nil))
+  "Search KDTREE for points within RADIUS of float vector V.  If
+keyword :KDRESULT is NIL, then a KDRESULT will be created.  Otherwise,
+given KDRESULT will be used to return the result.
 
-If SORT is true, then the KDRESULT is sorted by increasing distance from point given."
+If NEAREST-POINT is set, return just the nearest point.  This is
+especially efficient because the internal search radius keeps
+shrinking.
+
+If SORT is true, then the KDRESULT is sorted by increasing distance
+from point given.
+
+If ACTION is supplied, than it is applied to each matching point, and
+KDRESULT is ignored and set to NIL.  
+It is called as (FUNCALL ACTION INODE) where INODE is the linear index of a node.
+
+:ACTION (MAKE-DELETION-ACTION), for example, deletes any element returned by
+search by setting its value to a special symbol 'DELETED-OBJECT."
   (declare (type kdtree   kdtree)
 	   (type kdfltvec v)
 	   (type (or null kdresult))
+	   (type (or function symbol) action)
 	   (type kd-float radius)
 	   (optimize speed))
   (when (kdtree-needs-balancing kdtree)
     (error
      "KDTREE needs balancing with (BALANCE-KDTREE KDTREE) because insertions were performed with :DEFER"))
-  (let* ((kdresult (or kdresult (build-kdresult :n 10)))
+  (let* ((kdresult (if action nil (or kdresult (build-kdresult :n 10))))
+	 (%action (if (and action (symbolp action)) (fdefinition action) action)) 
 	 (ir-vec (kdtree-ir-vec kdtree))
 	 (r-vec (kdtree-r-vec kdtree))
+	 (obj-vec (kdtree-obj-vec kdtree))
 	 (index-left-vec (kdtree-index-left-vec kdtree))
 	 (index-right-vec (kdtree-index-right-vec kdtree))
 	 (ndim (kdtree-ndim kdtree))
-	 (nd-1 (1- ndim))	      
-	 (d2 (expt radius 2)))
-    (declare (type kd-float d2)
-	     (fixnum ndim nd-1))
-    (setf (kdresult-n kdresult) 0)
+	 (nd-1 (1- ndim))
+	 ;; search distance, which may shrink if we're finding just NEAREST-POINT
+	 (dist2 (expt radius 2)))
+    (declare (type kd-float dist2)
+	     (fixnum ndim nd-1)
+	     (type (or null function) %action)
+	     (optimize (speed 3) (safety 1))) ;; safety=0 provides 14% speed boost in SBCL
+    (when kdresult (setf (kdresult-n kdresult) 0))
     (labels ((%find-nearest (inode idim) ;; recursive function 
 	       (when (= inode +end+) (return-from %find-nearest))
-	       (let ((r2 (%distsqr inode))
+	       (let ((r2 (loop with j = (aref ir-vec inode) ;; indirection
+			       for  idim below ndim
+			       sum (expt (- (aref v idim) (aref r-vec j idim)) 2)
+				 of-type kd-float))
 		     (j (aref ir-vec inode))) ;; indirection
 		 (declare (type kd-float r2))
-		 (when (<= r2 d2)
-		   (%insert-point-in-kdresult kdtree kdresult inode (sqrt (the (real 0d0) r2))))
+		 
+		 (when (<= r2 dist2)
+		   (if action
+		       (funcall (the function %action) kdtree inode)
+		       (when (not (eq (aref obj-vec j) 'deleted-object))
+			 (%insert-point-in-kdresult
+			  kdtree kdresult inode r2
+			  nearest-point) ;; overwrite last point if nearest-point=T
+			 (when nearest-point
+			   ;; make the search radius smaller than the best point
+			   (setf dist2 r2)))))
+		 
 		 ;; search the side of the tree that our point is on
 		 (let* ((dx (- (aref v idim) (aref r-vec j idim))))
 		   (declare (type kd-float dx))
@@ -132,25 +169,32 @@ If SORT is true, then the KDRESULT is sorted by increasing distance from point g
 
 		   ;; if our point is within radius of the splitting x,y,z,
 		   ;; then we have to search the other side of the tree too
-		   (when (< (abs dx) radius)
+		   (when (< (* dx dx) dist2)
 		     (%find-nearest
 		      (if (<= dx 0)
 			  (aref index-right-vec inode)
 			  (aref index-left-vec inode))
-		      (if (= idim nd-1) 0 (1+ idim)))))))
-	     ;;
-	     (%distsqr (inode)
-	       (loop with j = (aref ir-vec inode) ;; indirection
-		     for  idim below ndim
-		     sum (expt (- (aref v idim) (aref r-vec j idim)) 2)
-		       of-type kd-float)))
+		      (if (= idim nd-1) 0 (1+ idim))))))))
 
       (%find-nearest 0 0) ;; start at first node
-      (when sort (sort-kdresult-by-radius kdresult))
+      (when (and sort (not nearest-point)) (sort-kdresult-by-radius kdresult))
+      (when nearest-point (setf (kdresult-n kdresult) 1))
       kdresult)))
 
+(defun kd-find-nearest-point (kdtree v &key (kdresult nil))
+  "Find the single nearest point to vector V in KDTREE. 
+A wrapper for:
+  (KD-SEARCH-IN-RADIUS KDTREE V HUGE-RADIUS :KDRESULT KDRESULT NEAREST-POINT T)
+
+The ACTION keyword is not supported because the result is not know
+before the end of the search."
+  (kd-search-in-radius kdtree v +most-positive-float+
+		       :kdresult  (or kdresult (build-kdresult :n 1))
+		       :nearest-point t))
+  
+
 (defun kd-find-k-nearest (kdtree v k-nearest &key (rstart nil) (kdresult nil))
-  "Find k-nearest objects in kdtree, by doing increasing radial
+  "Find k-nearest objects in KDTREE, by doing increasing radial
 searches. The returned KDRESULT will contain at least K-NEAREST points, sorted
 by radius.  It us up to the user to truncate the result to the first
 K-NEAREST.
@@ -158,7 +202,10 @@ K-NEAREST.
 RSTART is an optional starting radius size.  By default, it it set using 
 the volume fraction expected to be occupied by K-NEAREST points.
 
-Returns the number of search iterations as the second value."
+Returns the number of search iterations as the second value.
+
+The ACTION keyword is not supported because the result is not know
+before the end of the search."
   (declare (type kdtree   kdtree)
 	   (type kdfltvec v)
 	   (type (integer 0)  k-nearest)
@@ -196,27 +243,38 @@ Returns the number of search iterations as the second value."
 			   
 
 
-(defun kd-search-in-bbox (kdtree bbox &key (kdresult nil))
+(defun kd-search-in-bbox (kdtree bbox &key (kdresult nil) (action nil))
   (declare (type kdtree   kdtree)
 	   (type (or null kdresult))
+	   (type (or function symbol) action)
 	   (type bbox bbox))
     "Search KDTREE for points inside bounding box BBOX (of type BBOX).  If keyword :KDRESULT
 is NIL, then a KDRESULT will be created.  Otherwise, given KDRESULT will be used to
-return the result."
+return the result.
+
+If ACTION is supplied, than it is applied to each matching point, and
+KDRESULT is ignored and set to NIL.  
+It is called as (FUNCALL ACTION INODE) where INODE is the linear index of a node.
+
+:ACTION (MAKE-DELETION-ACTION), for example, deletes an element by setting its value
+to a special symbol 'DELETED-OBJECT."
   (when (kdtree-needs-balancing kdtree)
     (error
      "KDTREE needs balancing with (BALANCE-KDTREE KDTREE) because insertions were performed with :DEFER"))
-  (let* ((kdresult (or kdresult (build-kdresult :n 10)))
+  (let* ((kdresult (if action nil (or kdresult (build-kdresult :n 10))))
+	 (%action (if (and action (symbolp action)) (fdefinition action) action)) 
 	 (bbrmin (bbox-rmin-vec bbox))
 	 (bbrmax (bbox-rmax-vec bbox))
 	 (ir-vec (kdtree-ir-vec kdtree))
 	 (r-vec (kdtree-r-vec kdtree))
+	 (obj-vec (kdtree-obj-vec kdtree))
 	 (index-left-vec (kdtree-index-left-vec kdtree))
 	 (index-right-vec (kdtree-index-right-vec kdtree))
 	 (ndim (kdtree-ndim kdtree))
-	 (nd-1 (1- ndim)))	      
-    (declare (optimize speed))
-    (setf (kdresult-n kdresult) 0)
+	 (nd-1 (1- ndim)))
+    (declare (optimize (speed 3) (safety 1))
+	     (type (or null function) %action))
+    (when kdresult (setf (kdresult-n kdresult) 0))
     (when (not (= ndim (bbox-ndim bbox)))
       (error "Bounding Box BBOX has wrong number of dimensions for KDTREE."))
     (labels ((%find-inbox (inode idim) ;; recursive function 
@@ -235,7 +293,11 @@ return the result."
 			      finally (return t))))
 		 (declare (type kd-float rthis boxmin boxmax))
 		 (when in-box
-		   (%insert-point-in-kdresult kdtree kdresult inode (coerce 0 'kd-float))) 
+		   (if action
+		       (funcall (the function %action) kdtree inode)
+		       (when (not (eq (aref obj-vec j) 'deleted-object))
+			 (%insert-point-in-kdresult kdtree kdresult inode
+						    (coerce 0 'kd-float) nil))))
 
 		 
 		 ;; dx: which side of box is this node on?
@@ -265,3 +327,8 @@ return the result."
 	     
       (%find-inbox 0 0) ;; start at first node
       kdresult)))
+
+
+
+
+

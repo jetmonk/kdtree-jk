@@ -2,13 +2,18 @@
 (in-package kdtree-jk)
 
 (deftype kd-float ()
-  'single-float)
+  'double-float)
 (deftype kd-flag ()
   'bit)
 (deftype index ()
   '(signed-byte 32))
 (deftype dimnum () ;;  integer representing a dimension
   '(unsigned-byte 16))
+
+(defconstant +most-positive-float+
+  (if (typep 1d0 'kd-float)
+      most-positive-double-float
+      most-positive-single-float))
 
 ;; an end node indicator (no child to that side)
 (defconstant +end+ -1)

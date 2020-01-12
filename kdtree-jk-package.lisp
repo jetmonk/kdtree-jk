@@ -23,13 +23,16 @@
    #:insert-vector
    #:insert-2d
    #:insert-3d
+   #:kdtree-minimize-size
    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    ;; kdtree-jk-search.lisp
    #:build-bbox
    #:build-kdresult
    #:kd-search-in-radius
    #:kd-search-in-bbox
+   #:kd-find-nearest-point
    #:kd-find-k-nearest
+   #:make-deletion-action
    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    ))
 

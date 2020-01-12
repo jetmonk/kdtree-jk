@@ -58,6 +58,11 @@
     (setf (kdtree-npoints-total kdtree) npnew)))
 
 
+(defun kdtree-minimize-size (kdtree)
+  "Make the arrays in KDTREE just large enough to hold the data."
+  (%expand-kdtree kdtree :new-size (kdtree-npoints kdtree)))
+
+
 ;; jr is row index in r-vec, and k is index in
 ;; all other vectors; generally, they are the same, but
 ;; perhaps in a reshuffling they will be different
@@ -197,4 +202,28 @@ data."
     (insert-vector kdtree vec object :defer defer)))
 
   
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defun make-deletion-action (&key (test (constantly t)))
+  "Function to generate a function to pass as an :ACTION, to delete
+objects according to :TEST.
+
+TEST is an optional function taking the OBJECT inside KDTREE-OBJ-VEC,
+returning T if this object is to be deleted.
+
+For example, 
+ (MAKE-DELETION-ACTION (LAMBDA (OBJ) (EQ OBJ *MY-OBJ*))) 
+will return an action to delete objects EQ to *MY-OBJ*
+that are picked up by the search.
+and 
+ (MAKE-DELETION-ACTION) will return an action to
+delete all objects picked up by the KDTREE search."
+  (lambda (kdtree inode)
+    (declare (type kdtree kdtree)
+	     (type index inode)
+	     (optimize speed))
+    (when (funcall test (aref (kdtree-obj-vec kdtree) (aref (kdtree-ir-vec kdtree) inode)))
+      (setf (aref (kdtree-obj-vec kdtree) (aref (kdtree-ir-vec kdtree) inode)) 'deleted-object))))
 
