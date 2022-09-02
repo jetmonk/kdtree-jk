@@ -77,7 +77,8 @@ representing the bounds."
 
   
 
-;; FIXME - would be nice to have specialized in-place heapsort without consing
+;; FIXME - would be nice to have specialized in-place heapsort without consing, but
+;; GC time is negligible
 (defun sort-kdresult-by-radius (kdresult)
   (when (> (kdresult-n kdresult) 1) ;; just 1 point might be a common result
     (let ((vec (loop with v = (make-array (kdresult-n kdresult))
@@ -92,6 +93,7 @@ representing the bounds."
 	    do (setf (aref (kdresult-dist-vec kdresult)  i) (first lst)
 		     (aref (kdresult-index-vec kdresult) i) (second lst)
 		     (aref (kdresult-obj-vec kdresult)   i) (third lst))))))
+
 
 
 (defun kd-search-in-radius (kdtree v radius &key (kdresult nil) (sort nil) (nearest-point nil) (action nil))
@@ -131,7 +133,9 @@ search by setting its value to a special symbol 'DELETED-OBJECT."
 	 (ndim (kdtree-ndim kdtree))
 	 (nd-1 (1- ndim))
 	 ;; search distance, which may shrink if we're finding just NEAREST-POINT
-	 (dist2 (expt radius 2)))
+	 (dist2 (if (>= radius #.(sqrt +most-positive-float+))
+		    +most-positive-float+ ;; avoid overflow for nearest-search case
+		    (expt radius 2))))
     (declare (type kd-float dist2)
 	     (fixnum ndim nd-1)
 	     (type (or null function) %action)
@@ -186,7 +190,7 @@ search by setting its value to a special symbol 'DELETED-OBJECT."
 A wrapper for:
   (KD-SEARCH-IN-RADIUS KDTREE V HUGE-RADIUS :KDRESULT KDRESULT NEAREST-POINT T)
 
-The ACTION keyword is not supported because the result is not know
+The ACTION keyword is not supported because the result is not known
 before the end of the search."
   (kd-search-in-radius kdtree v +most-positive-float+
 		       :kdresult  (or kdresult (build-kdresult :n 1))
