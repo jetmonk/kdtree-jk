@@ -148,7 +148,12 @@ See usage-example.txt
   will return an action to delete objects EQ to *MY-OBJ* that are
   picked up by the search.  and (MAKE-DELETION-ACTION) will return an
   action to delete all objects picked up by the KDTREE search.
- 
+
+(make-search-action object-function)
+
+  Make a function that can be passed as an :ACTION to search
+  functions, that will (FUNCALL OBJECT-FUNCTION OBJECT) to each object
+  in KDTREE-OBJECT-VEC that falls inside the search.
 
 ===== KDRESULT ===========================
 

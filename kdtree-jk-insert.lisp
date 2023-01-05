@@ -224,6 +224,20 @@ delete all objects picked up by the KDTREE search."
     (declare (type kdtree kdtree)
 	     (type index inode)
 	     (optimize speed))
-    (when (funcall test (aref (kdtree-obj-vec kdtree) (aref (kdtree-ir-vec kdtree) inode)))
-      (setf (aref (kdtree-obj-vec kdtree) (aref (kdtree-ir-vec kdtree) inode)) 'deleted-object))))
+    (when (funcall test (aref (kdtree-obj-vec kdtree)
+			      (aref (kdtree-ir-vec kdtree) inode)))
+      (setf (aref (kdtree-obj-vec kdtree)
+		  (aref (kdtree-ir-vec kdtree) inode))
+	    'deleted-object))))
 
+
+(defun make-search-action (object-function)
+  "Make a function that can be passed as an :ACTION to search
+functions, that will (FUNCALL OBJECT-FUNCTION OBJECT) to each object
+in KDTREE-OBJECT-VEC that falls inside the search."
+    (lambda (kdtree inode)
+    (declare (type kdtree kdtree)
+	     (type index inode)
+	     (optimize speed))
+      (funcall object-function (aref (kdtree-obj-vec kdtree)
+				     (aref (kdtree-ir-vec kdtree) inode)))))

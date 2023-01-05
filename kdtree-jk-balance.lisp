@@ -6,12 +6,16 @@
 
 (defun balance-kdtree (kdtree)
   "Balances a KDTREE by ensuring that each node splits the remaining set in 2.
-Also removes any deleted objects (objects with object-vec set to 'DELETED-OBJECT)"
+Also removes any deleted objects (objects with object-vec set to
+'DELETED-OBJECT)
+
+This seems to be a N [log(n)]^2 operation.
+"
   (declare (type kdtree kdtree)
 	   (optimize speed))
 
-  ;; if any deleted objects (obj-vec[j]='deleted-object) then
-  ;; compact the arrays to remove them
+  ;; if there are any deleted objects (ie obj-vec[j]='deleted-object)
+  ;; then compact the arrays to remove them
   (%remove-deleted-objects kdtree)
   
   (let* ((np (kdtree-npoints kdtree))

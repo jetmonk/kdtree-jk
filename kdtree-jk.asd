@@ -10,8 +10,15 @@
    (:file "kdtree-jk-insert"  :depends-on ("kdtree-jk-structs" "kdtree-jk-balance"))
    (:file "kdtree-jk-search"  :depends-on ("kdtree-jk-structs" "kdtree-jk-balance"))))
 
-  
-(asdf:defsystem kdtree-jk/tests
+
+(asdf:defsystem kdtree-jk/latlon
   :depends-on (kdtree-jk)
   :components
-  ((:file "kdtree-jk-tests")))
+  ((:file "kdtree-jk-latlon")))
+
+
+(asdf:defsystem kdtree-jk/tests
+  :depends-on (kdtree-jk kdtree-jk/latlon)
+  :components
+  ((:file "kdtree-jk-tests")
+   (:file "kdtree-jk-tests-latlon")))

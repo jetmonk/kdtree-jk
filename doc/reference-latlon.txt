@@ -1,0 +1,38 @@
+KDTREE-JK/LATLON is a package for using KD-Trees to search
+in latitude and longitude, by putting points on the unit sphere, and searching
+in 3d.
+
+==== Functions ======
+
+(build-kdtree-latlon :npoints 10)
+
+   Trivial wrapper to make a 3d KD tree, with a subclassed defstruct.
+
+
+(insert-latlon kdtree-latlon longitude latitude object
+			     &key vec defer)
+
+   Insert longitude,latitude into KD tree.  VEC is an optinal temporary
+   vector of length 3 to reduce consing. DEFER is to defer insertion
+   until balancing.
+
+
+(kd-latlon-search-in-angle
+    kdtree-latlon longitude latitude angular-distance
+    &key vec kdresult sort nearest-point action)
+
+     Search a 3d KDTREE-LATLON around LONGITUDE,LATIDUDE (degrees) and
+     return points within ANGULAR-DISTANCE (degrees, along surface of
+     unit sphere).  VEC is an optional scratch vector of length 3 of
+     type KD-FLOAT.
+
+     As in KDTREE package, KDRESULT is the result structure, sort
+     means to sort by distance, NEAREST-POINT means to return only
+     single nearest point, and ACTION is to perform action instead of
+     search.
+
+     The distance returned in KDRESULT is modified to represent the
+     along-surface distance of unit sphere.
+
+
+

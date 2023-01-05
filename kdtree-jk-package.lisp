@@ -5,6 +5,9 @@
    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    ;; kdtree-jk-structs.lisp
    ;;
+   ;; types useful to export
+   #:kd-float #:index #:dimnum
+   ;;
    #:kdtree #:kdtree-p #:kdtree-ndim #:kdtree-npoints #:kdtree-idepth
    #:kdtree-avg-depth #:kdtree-obj-vec #:kdtree-bbox #:kdtree-r-vec
    ;;
@@ -33,6 +36,8 @@
    #:kd-find-nearest-point
    #:kd-find-k-nearest
    #:make-deletion-action
+   #:make-search-action
    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    ))
+
 

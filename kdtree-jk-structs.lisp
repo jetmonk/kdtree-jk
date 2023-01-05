@@ -3,6 +3,11 @@
 
 (deftype kd-float ()
   'double-float)
+
+;;(deftype kd-float ()
+;;  'single-float)
+
+
 (deftype kd-flag ()
   'bit)
 (deftype index ()

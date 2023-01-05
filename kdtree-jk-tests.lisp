@@ -4,7 +4,7 @@
 
 
 (defpackage kdtree-jk/tests
-  (:use #:cl #:kdtree-jk)
+  (:use #:cl #:kdtree-jk #:kdtree-jk/latlon)
   (:export
    #:run-radius-test-set
    #:run-k-nearest-test-set
@@ -13,6 +13,9 @@
    #:run-hash-deletion-test-set
    #:run-kd-test-series  ;; this is an extensive brute-force test of kd trees 
    #:wirth-partition-test
+   ;;
+   #:run-one-latlon-test
+   #:run-latlon-test-set
    ))
 
 (in-package kdtree-jk/tests)
