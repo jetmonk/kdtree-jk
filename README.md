@@ -27,5 +27,6 @@ See doc/reference-latlon.txt for documentation to a second package,
     KDTREE-JK/LATLON, to search in longitude,latitude coordinates
     by converting to 3d points on a unit sphere.
 
+kdtree-jk is written in pure Common Lisp, with no dependencies.
 
 Submit bug reports at https://github.com/jetmonk/kdtree-jk/issues
