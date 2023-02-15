@@ -2,7 +2,7 @@
 
 (asdf:defsystem kdtree-jk
   :author "jetmonk@gmail.com"
-  :description "KD-TREE package for searching for nearest neighbors in M points in in N-dimensions in N log(N) time."
+  :description "KD-TREE package for searching for nearest neighbors in N points in in M-dimensions in N log(N) time."
   :license "MIT"
   :depends-on ()
   :components
