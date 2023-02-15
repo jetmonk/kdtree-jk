@@ -2,6 +2,7 @@
 
 (asdf:defsystem kdtree-jk
   :author "jetmonk@gmail.com"
+  :description "KD-TREE package for searching for nearest neighbors in M points in in N-dimensions in N log(N) time."
   :license "MIT"
   :depends-on ()
   :components
@@ -20,6 +21,7 @@
 
 (asdf:defsystem kdtree-jk/latlon
   :author "jetmonk@gmail.com"
+  :description "Extension for KDTREE-JK to search in latitude and longitude by converting 2D latitude and longitude into 3D x,y,z."
   :license "MIT"
   :depends-on (kdtree-jk)
   :components
@@ -28,6 +30,7 @@
 
 (asdf:defsystem kdtree-jk/tests
   :author "jetmonk@gmail.com"
+  :description "Tests for KDTREE-JK comparing results to brute force search."
   :license "MIT"
   :depends-on (kdtree-jk kdtree-jk/latlon)
   :components
